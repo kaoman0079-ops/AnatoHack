@@ -268,12 +268,12 @@
         <div id="setup-view" style="display: none;">
             <section>
                 <div class="section-header">
-                    <h3>出題する章</h3>
+                    <h3>出題するカテゴリ</h3>
                     <label class="all-select-label">
-                        <input type="checkbox" id="all-chapters-checkbox" checked onchange="toggleAllChapters(this)">全章
+                        <input type="checkbox" id="all-categories-checkbox" checked onchange="toggleAllCategories(this)">全選択
                     </label>
                 </div>
-                <div class="checkbox-group" id="chapter-container"></div>
+                <div class="checkbox-group" id="category-container"></div>
             </section>
 
             <section>
@@ -304,7 +304,7 @@
             </div>
 
             <div class="question-card">
-                <div class="card-tag" id="card-tag">第0章 ・ 分野</div>
+                <div class="card-tag" id="card-tag">カテゴリ ・ 分野</div>
                 <div class="question-text" id="question-text">問題文がここに表示されます</div>
                 
                 <div class="options-list" id="options-container"></div>
@@ -344,7 +344,7 @@
 
     <script>
         let rawDatabase = [];
-        let uniqueChapters = [];
+        let uniqueCategories = [];
         let quizQueue = [];
         let currentIndex = 0;
         let score = 0;
@@ -365,7 +365,7 @@
                 })
                 .then(text => {
                     parseCSV(text);
-                    generateChapterCheckboxes();
+                    generateCategoryCheckboxes();
                     document.getElementById('loading-view').style.display = 'none';
                     document.getElementById('setup-view').style.display = 'block';
                 })
@@ -385,54 +385,49 @@
 
                 // カンマ分割
                 const parts = line.split(',');
-                if (parts.length >= 11) {
+                if (parts.length >= 10) {
                     const item = {
                         no: parts[0].trim(),
-                        ch: parts[1].trim(),
-                        category: parts[2].trim(),
+                        category: parts[1].trim(),   // 旧：ch から「カテゴリ」へ変更
+                        field: parts[2].trim(),      // 旧：category から「分野」へ変更
                         q: parts[3].trim(),
                         opts: [parts[4].trim(), parts[5].trim(), parts[6].trim(), parts[7].trim()],
-                        ans: parts[8].trim(), // "1" や "2・3" などの文字列
-                        imp: parts[9].trim(),
-                        exp: parts[10].trim()
+                        ans: parts[8].trim(),        // "1" や "2・3"
+                        exp: parts[9].trim()         // 旧：parts[10] から、カラム削減に伴い parts[9] へ
                     };
                     rawDatabase.push(item);
 
-                    if (!uniqueChapters.includes(item.ch)) {
-                        uniqueChapters.push(item.ch);
+                    if (!uniqueCategories.includes(item.category)) {
+                        uniqueCategories.push(item.category);
                     }
                 }
             }
-            // 章の順序を数値で綺麗にソート
-            uniqueChapters.sort((a, b) => {
-                const numA = parseInt(a.replace(/[^0-9]/g, '')) || 0;
-                const numB = parseInt(b.replace(/[^0-9]/g, '')) || 0;
-                return numA - numB;
-            });
+            // カテゴリ名をソート
+            uniqueCategories.sort();
         }
 
-        // 2. 画面上の章チェックボックスを自動生成
-        function generateChapterCheckboxes() {
-            const container = document.getElementById('chapter-container');
+        // 2. 画面上のカテゴリチェックボックスを自動生成
+        function generateCategoryCheckboxes() {
+            const container = document.getElementById('category-container');
             container.innerHTML = "";
-            uniqueChapters.forEach(ch => {
+            uniqueCategories.forEach(cat => {
                 const label = document.createElement('label');
                 label.className = 'btn-label';
-                label.innerHTML = `<input type="checkbox" name="chapter" value="${ch}" checked onchange="onIndividualChange()">${ch}`;
+                label.innerHTML = `<input type="checkbox" name="category" value="${cat}" checked onchange="onIndividualChange()">${cat}`;
                 container.appendChild(label);
             });
         }
 
-        function toggleAllChapters(master) {
-            const checkboxes = document.querySelectorAll('input[name="chapter"]');
+        function toggleAllCategories(master) {
+            const checkboxes = document.querySelectorAll('input[name="category"]');
             checkboxes.forEach(cb => {
                 cb.checked = master.checked;
             });
         }
 
         function onIndividualChange() {
-            const checkboxes = document.querySelectorAll('input[name="chapter"]');
-            const allCheckbox = document.getElementById('all-chapters-checkbox');
+            const checkboxes = document.querySelectorAll('input[name="category"]');
+            const allCheckbox = document.getElementById('all-categories-checkbox');
             const checkedCount = Array.from(checkboxes).filter(cb => cb.checked).length;
 
             if (checkedCount === checkboxes.length) {
@@ -465,13 +460,13 @@
 
         // 3. クイズ開始
         function startQuiz() {
-            const selectedChapters = Array.from(document.querySelectorAll('input[name="chapter"]:checked')).map(el => el.value);
-            if (selectedChapters.length === 0) {
-                alert("出題する章を1つ以上選択してください。");
+            const selectedCategories = Array.from(document.querySelectorAll('input[name="category"]:checked')).map(el => el.value);
+            if (selectedCategories.length === 0) {
+                alert("出題するカテゴリを1つ以上選択してください。");
                 return;
             }
 
-            let filtered = rawDatabase.filter(item => selectedChapters.includes(item.ch));
+            let filtered = rawDatabase.filter(item => selectedCategories.includes(item.category));
 
             const order = document.querySelector('input[name="order"]:checked').value;
             if (order === "shuffle") {
@@ -509,7 +504,7 @@
 
             document.getElementById("current-index").innerText = `第 ${currentIndex + 1} 問 / 全 ${quizQueue.length} 問`;
             document.getElementById("current-score").innerText = `正解: ${score}`;
-            document.getElementById("card-tag").innerText = `${currentItem.ch} ・ ${currentItem.category} (No.${currentItem.no})`;
+            document.getElementById("card-tag").innerText = `${currentItem.category} ・ ${currentItem.field} (No.${currentItem.no})`;
             document.getElementById("question-text").innerText = currentItem.q;
             
             // 4択ボタンの生成
